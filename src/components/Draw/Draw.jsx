@@ -4,7 +4,7 @@ import { OrbitControls, Environment, Center } from "@react-three/drei";
 import Model from "../../../public/Scene.jsx";
 import GestureModelController from "../GestureModelController.jsx";
 import LoadingScreen from "../LoadingScreen.jsx";
-
+import { Helmet } from "react-helmet";
 export default function DrawingCanvas() {
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
@@ -783,6 +783,47 @@ export default function DrawingCanvas() {
   ]);
 
   return (
+<>
+    
+<Helmet>
+  {/* Primary SEO */}
+  <title>Air Canvas 3D | Draw with Hand Gestures & Control 3D Models in Real-Time</title>
+  <meta 
+    name="description" 
+    content="Air Canvas 3D lets you draw in the air using hand gestures and control 3D models in real-time. Built with AI, computer vision, and modern web technologies for an immersive experience." 
+  />
+  <meta 
+    name="keywords" 
+    content="air canvas, hand gesture drawing, 3D gesture control, computer vision project, AI drawing app, gesture based drawing, 3D model control, mediapipe hands, webgl 3d app, react three fiber project" 
+  />
+  <meta name="author" content="Your Name" />
+
+  {/* Viewport */}
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  {/* Robots */}
+  <meta name="robots" content="index, follow" />
+
+  {/* Canonical URL */}
+  <link rel="canonical" href="https://air-canvas-3d.netlify.app/" />
+
+  {/* Open Graph (Facebook / LinkedIn) */}
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Air Canvas 3D - Draw & Control 3D Models with Hand Gestures" />
+  <meta property="og:description" content="Experience futuristic drawing using hand gestures and interact with 3D models in real-time using AI-powered tracking." />
+  <meta property="og:url" content="https://air-canvas-3d.netlify.app/" />
+  {/* <meta property="og:image" content="https://air-canvas-3d.netlify.app/preview.png" /> */}
+
+  {/* Twitter SEO */}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Air Canvas 3D - Gesture Based Drawing & 3D Control" />
+  <meta name="twitter:description" content="Draw in air and control 3D models using hand gestures. Built using AI & computer vision." />
+  {/* <meta name="twitter:image" content="https://air-canvas-3d.netlify.app/preview.png" /> */}
+
+  {/* Theme Color */}
+  <meta name="theme-color" content="#0f172a" />
+</Helmet>
+
     <div className={`app-container ${show3DViewer ? "app-container--3d" : "app-container--drawing"}`}>
       {/* Hidden video element */}
       <video ref={videoRef} style={{ display: "none" }} autoPlay playsInline muted />
@@ -959,6 +1000,7 @@ export default function DrawingCanvas() {
         </>
       )}
     </div>
+    </>
   );
 }
 
