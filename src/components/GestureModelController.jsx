@@ -11,124 +11,118 @@ export default function GestureModelController({
   const prevHandXRef = useRef(null);
   const prevHandYRef = useRef(null);
   const prevTwoHandDistanceRef = useRef(null);
-  const rotationSpeedRef = useRef(0.01);
-  const zoomSpeedRef = useRef(0.008);
-  const initialModelPositionRef = useRef(null);
   const dragStartPositionRef = useRef(null);
   const isDraggingRef = useRef(false);
 
-  // Store initial model position when component mounts
-  useEffect(() => {
-    if (groupRef?.current && !initialModelPositionRef.current) {
-      initialModelPositionRef.current = {
-        x: groupRef.current.position.x,
-        y: groupRef.current.position.y,
-        z: groupRef.current.position.z
-      };
-    }
-  }, [groupRef]);
+  // Store initial model position & rotation for clean reset
+  const initialPositionRef = useRef({ x: 0, y: 0, z: 0 });
+  const targetRotationYRef = useRef(0);
+  const currentRotationYRef = useRef(0);
 
-  // Handle model rotation based on hand left/right movement (only X-axis rotation)
+  // Smooth rotation update based on horizontal hand movement
   useEffect(() => {
-    if (!groupRef?.current || !handPosition) return;
+    if (!groupRef?.current || !handPosition) {
+      prevHandXRef.current = null;
+      return;
+    }
+
     const model = groupRef.current;
-    // Get current hand X position (0-1 range, 0.5 is center)
     const currentHandX = handPosition.x;
+
     if (prevHandXRef.current !== null && !isGrabbing && !isPinching) {
-      // Calculate hand movement (left or right)
-      const handMovement = currentHandX - prevHandXRef.current;
-      // Rotate model based on hand movement (only Y-axis rotation)
-      if (Math.abs(handMovement) > 0.005) {
-        model.rotation.y += handMovement * rotationSpeedRef.current;
+      // Normalize movement across canvas width (800px)
+      const deltaX = (currentHandX - prevHandXRef.current) / 800;
+      
+      // Filter out micro-jitter
+      if (Math.abs(deltaX) > 0.003) {
+        model.rotation.y += deltaX * 3.2;
       }
     }
     prevHandXRef.current = currentHandX;
   }, [handPosition, groupRef, isGrabbing, isPinching]);
 
-  // Handle model dragging (panning) with pinch gesture
+  // Smooth model translation (panning) with pinch gesture
   useEffect(() => {
-    if (!groupRef?.current || !handPosition) return;
+    if (!groupRef?.current || !handPosition) {
+      isDraggingRef.current = false;
+      dragStartPositionRef.current = null;
+      prevHandYRef.current = null;
+      return;
+    }
+
     const model = groupRef.current;
+
     if (isPinching) {
-      if (!isDraggingRef.current && prevHandXRef.current !== null && prevHandYRef.current !== null) {
-        // Start dragging
+      if (!isDraggingRef.current) {
         isDraggingRef.current = true;
         dragStartPositionRef.current = {
-          x: handPosition.x,
-          y: handPosition.y,
+          startX: handPosition.x,
+          startY: handPosition.y,
           modelX: model.position.x,
-          modelY: model.position.y
+          modelY: model.position.y,
         };
-      } else if (isDraggingRef.current && dragStartPositionRef.current && prevHandXRef.current !== null) {
-        // Calculate drag movement
-        const deltaX = (handPosition.x - dragStartPositionRef.current.x) * 0.006;
-        const deltaY = (handPosition.y - dragStartPositionRef.current.y) * 0.006;
-        // Move model within screen bounds
-        const newX = dragStartPositionRef.current.modelX + deltaX;
-        const newY = dragStartPositionRef.current.modelY - deltaY;
-        // Apply bounds to keep model within view
-        model.position.x = Math.max(-3, Math.min(3, newX));
-        model.position.y = Math.max(-2, Math.min(2, newY));
+      } else if (dragStartPositionRef.current) {
+        // Delta scaled to 3D world units
+        const deltaX = ((handPosition.x - dragStartPositionRef.current.startX) / 800) * 4.5;
+        const deltaY = ((handPosition.y - dragStartPositionRef.current.startY) / 600) * 3.5;
+
+        const targetX = dragStartPositionRef.current.modelX + deltaX;
+        const targetY = dragStartPositionRef.current.modelY - deltaY;
+
+        // Clamp within comfortable viewport view
+        model.position.x = Math.max(-2.5, Math.min(2.5, targetX));
+        model.position.y = Math.max(-1.8, Math.min(1.8, targetY));
       }
     } else {
-      // Reset dragging state when pinch ends
       isDraggingRef.current = false;
       dragStartPositionRef.current = null;
     }
+
     prevHandYRef.current = handPosition.y;
   }, [handPosition, isPinching, groupRef]);
 
-  // Handle camera zoom based on two-hand pinch distance
+  // Handle camera zoom based on distance between two hands
   useEffect(() => {
-    if (!orbitControlsRef?.current || twoHandDistance === null) return;
+    if (!orbitControlsRef?.current || twoHandDistance === null) {
+      prevTwoHandDistanceRef.current = null;
+      return;
+    }
+
     const controls = orbitControlsRef.current;
-    const currentDistance = twoHandDistance;
+    const currentDist = twoHandDistance;
+
     if (prevTwoHandDistanceRef.current !== null) {
-      // Calculate distance change
-      const distanceChange = currentDistance - prevTwoHandDistanceRef.current;
-      // Get current camera distance
-      const cameraDistance = controls.getDistance();
-      // Zoom based on hand distance change
-      if (Math.abs(distanceChange) > 2) {
-        // Apply constraints based on orbit controls limits
-        const minDist = controls.minDistance || 1.5;
-        const maxDist = controls.maxDistance || 8;
-        // Calculate new distance with sensitivity (negative because hands apart = zoom out)
-        let newDistance;
-        if (distanceChange > 0) {
-          // Hands moving apart - zoom out
-          newDistance = cameraDistance + distanceChange * zoomSpeedRef.current;
-        } else {
-          // Hands moving together - zoom in
-          newDistance = cameraDistance + distanceChange * zoomSpeedRef.current;
-        }
-        // Clamp to min/max limits
-        const clampedDistance = Math.max(minDist, Math.min(maxDist, newDistance));
-        // Update camera position
-        const direction = controls.target.clone().sub(controls.object.position).normalize();
-        controls.object.position.copy(controls.target.clone().sub(direction.multiplyScalar(clampedDistance)));
+      const deltaDist = currentDist - prevTwoHandDistanceRef.current;
+
+      if (Math.abs(deltaDist) > 1.5) {
+        const cameraDist = controls.getDistance();
+        const minDist = controls.minDistance || 1.2;
+        const maxDist = controls.maxDistance || 8.0;
+
+        // Moving apart zooms out, moving together zooms in
+        const newDist = Math.max(minDist, Math.min(maxDist, cameraDist - deltaDist * 0.008));
+
+        const dir = controls.target.clone().sub(controls.object.position).normalize();
+        controls.object.position.copy(controls.target.clone().sub(dir.multiplyScalar(newDist)));
         controls.update();
       }
     }
-    prevTwoHandDistanceRef.current = currentDistance;
+    prevTwoHandDistanceRef.current = currentDist;
   }, [twoHandDistance, orbitControlsRef]);
 
-  // Reset model position when hands touch (twoHandDistance becomes very small)
+  // Reset model when hands touch (distance < 35px)
   useEffect(() => {
-    if (twoHandDistance !== null && twoHandDistance < 35 && groupRef?.current && initialModelPositionRef.current) {
-      // Reset model position and rotation
-      groupRef.current.position.copy(initialModelPositionRef.current);
-      groupRef.current.rotation.y = 0;
-      
-      // Reset camera view if orbit controls available
+    if (twoHandDistance !== null && twoHandDistance < 35 && groupRef?.current) {
+      groupRef.current.position.set(0, 0, 0);
+      groupRef.current.rotation.set(0, 0, 0);
+
       if (orbitControlsRef?.current) {
-        const controls = orbitControlsRef.current;
-        controls.target.set(0, 0, 0);
-        controls.update();
+        orbitControlsRef.current.reset();
+        orbitControlsRef.current.target.set(0, 0, 0);
+        orbitControlsRef.current.update();
       }
     }
   }, [twoHandDistance, groupRef, orbitControlsRef]);
 
-  // This is a controller component that doesn't render anything
   return null;
 }
